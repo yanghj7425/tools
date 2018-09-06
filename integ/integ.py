@@ -14,8 +14,6 @@ class Integ:
         self.password = "123456"
         self.dataBase = 'ipb_pudong'
 
-
-
     def getConnection(self):
         
         db = mysql.connect(
