@@ -44,6 +44,7 @@ class SumInteg:
                                         AND sub.year = '2018'
                                 GROUP BY PARTY_MEMBER_ID , rule_id
                                 HAVING SUM(sub.point) > frule.total
+                                
                             '''
 
         queryOverFlowIntegSql = ''' 
