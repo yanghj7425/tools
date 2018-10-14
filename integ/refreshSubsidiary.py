@@ -8,10 +8,10 @@ import datetime
 class Integ:
     def __init__(self):
 
-        self.host = '117.184.59.230'
-        self.port = 7088
-        self.user = "ipb"
-        self.password = "dreamsoft"
+        self.host = '192.168.0.28'
+        self.port = 3306
+        self.user = "root"
+        self.password = "123456"
         self.dataBase = 'ipb_pudong'
 
 
@@ -70,7 +70,7 @@ class Integ:
         return  '''
                     UPDATE integ_base 
                         SET 
-                            BASCPOINT = BASCPOINT + {subtraction}
+                            BASCPOINT = BASCPOINT - {subtraction}
                         WHERE
                             memberid = '{memberId}'
                             AND BASCRULEID = '{ruleFid}';
@@ -81,7 +81,7 @@ class Integ:
         return  '''
                     UPDATE integ_person_point 
                         SET 
-                            TOTAL = TOTAL + {subtraction}
+                            TOTAL = TOTAL - {subtraction}
                         WHERE
                             MEMBERID = '{memberId}';
                 '''
@@ -105,14 +105,13 @@ class Integ:
             # 初始化单项总分
             basePoint = 0
 
-            
             # 如果分数超出
             if overs >= 0 :
                 # 设置对应规则下的满分单项总分 
                 basePoint = total
                 # 置空积分明细
                 updateSubsidiaryFormatSQL = self.getUpdateSubsidiarySQL().format(memberId = member_id, ruleId = rul_id, overs = int(overs))
-                cursor.execute(updateSubsidiaryFormatSQL)
+                #cursor.execute(updateSubsidiaryFormatSQL)
                 file.write(updateSubsidiaryFormatSQL)
             
             else: # 如果没有超出，则把计算得到的总分设置为 单项总分
@@ -120,11 +119,11 @@ class Integ:
                 
             updateBaseIntegFormatSQL = self.getUpdateBaseIntegSQL().format(memberId = member_id, ruleFid = rul_fid, subtraction = basePoint)
             file.write(updateBaseIntegFormatSQL)
-            cursor.execute(updateBaseIntegFormatSQL)
+            #cursor.execute(updateBaseIntegFormatSQL)
 
             updatePersonPointFormatSQL = self.getUpdatePersonPointSQL().format(memberId = member_id, subtraction = basePoint)
             file.write(updatePersonPointFormatSQL)
-            cursor.execute(updatePersonPointFormatSQL)
+            #cursor.execute(updatePersonPointFormatSQL)
 
             db.commit()
      

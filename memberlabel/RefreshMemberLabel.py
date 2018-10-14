@@ -7,10 +7,10 @@ import datetime
 class MemberLabel:
 
     def __init__(self):
-        self.host = '192.168.0.28'
+        self.host = '192.168.0.49'
         self.port = 3306
         self.user = "root"
-        self.password = "123456"
+        self.password = "dreamsoft"
         self.dataBase = 'ipb_pudong'
 
     

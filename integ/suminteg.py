@@ -67,7 +67,8 @@ class SumInteg:
                                         POINT = '0',
                                         ISOVERFLOW = '1'
                                     WHERE
-                                        id = '{overFlowItemId}' '''
+                                        id = '{overFlowItemId}' 
+                                    '''
 
         cur.execute(queryIntegSql)
         result = cur.fetchall()
