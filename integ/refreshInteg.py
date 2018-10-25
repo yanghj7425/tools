@@ -9,10 +9,10 @@ import datetime
 class refreshInteg:
     def __init__(self):
 
-        self.host = '192.168.0.49'
+        self.host = '192.168.0.28'
         self.port = 3306
         self.user = "root"
-        self.password = "dreamsoft"
+        self.password = "123456"
         self.dataBase = 'ipb_pudong'
 
     def getConnection(self):
@@ -29,17 +29,15 @@ class refreshInteg:
     # 获取需要检查积分的党员ID
     def getCheckMemberId(self):
         return '''
-                    SELECT 
+                   SELECT DISTINCT
                         PARTY_MEMBER_ID
                     FROM
-                        integ_person_subsidiary
-                    GROUP BY PARTY_MEMBER_ID;
+                        integ_person_subsidiary; 
                 '''
-
 
     def getErrorIntegMemeberSQL(self):
         return '''
-                    SELECT 
+                    SELECT DISTINCT
                         CALC_SUM, BASCPOINT,  C.TOTAL, BASCRULEID, MEMBERID
                     FROM
                         (SELECT 
@@ -58,18 +56,16 @@ class refreshInteg:
                         LEFT JOIN integ_rule R ON A.RULE_ID = R.ID
                         GROUP BY R.FID , A.PARTY_MEMBER_ID) C
                             LEFT JOIN
-                        (SELECT 
+                        (SELECT DISTINCT
                             BASCPOINT, BASCRULEID
                         FROM
                             integ_base
                         WHERE
                             MEMBERID = '{memberId}'
                                 AND year = '2018') D ON C.FID = D.BASCRULEID
-                    WHERE
-                        CALC_SUM != BASCPOINT;
+                #    WHERE
+                #        CALC_SUM != BASCPOINT;
                '''
-
-
 
     def getOverFlowSubsidiarySQL(self):
         return '''
@@ -155,10 +151,9 @@ class refreshInteg:
                             AND YEAR = 2018;
                 '''
 
-
     # 获取现在该党员数据库的总分
     def getIntegPersonPoint(self):
-        return  '''         
+        return '''         
                     SELECT 
                         TOTAL
                     FROM
@@ -168,13 +163,9 @@ class refreshInteg:
                             AND YEAR = '2018';
                 '''
 
-
-
-
-
     # 处理冗余的积明细
     def doCalcEachMemberIntegSubsidiary(self, file, overFlowSubs, cursor):
-    
+
         for overFlowSub in overFlowSubs:
             #规则明细ID
             rId = overFlowSub[0]
@@ -185,34 +176,37 @@ class refreshInteg:
             # 如果分数超出
             if int(float(overs)) > 0:
                 # 置空积分明细
-                updateSubsidiaryFormatSQL = self.getUpdateSubsidiarySQL().format(memberId=aMemberId, ruleId=rId, overs=int(float(overs)))
+                updateSubsidiaryFormatSQL = self.getUpdateSubsidiarySQL(
+                ).format(
+                    memberId=aMemberId, ruleId=rId, overs=int(float(overs)))
                 # cursor.execute(updateSubsidiaryFormatSQL)
+                print('overs: ', overs)
                 file.write(updateSubsidiaryFormatSQL)
-            
+
     def doCalcIntegBase(self, file, cursor, overFlowSubs):
         print(overFlowSubs)
 
-        for overFlowSub in  overFlowSubs:
+        for overFlowSub in overFlowSubs:
             #规则二级 ID
             rFid = overFlowSub[1]
             print(rFid)
             #党员 ID
-            memberId = overFlowSub[3]  
-            queryIntegBaseSQL = self.getIntegBaseSQL().format(memberId = memberId, level2Id= rFid)     
+            memberId = overFlowSub[3]
+            queryIntegBaseSQL = self.getIntegBaseSQL().format(
+                memberId=memberId, level2Id=rFid)
             cursor.execute(queryIntegBaseSQL)
             integBases = cursor.fetchall()
 
             for integBase in integBases:
-                print (integBase)
+                print(integBase)
 
     #查询积分出错的党员
     def queryErrorIntegMemeber(self, memberId, cursor):
-        
-        queryErrorIntegMemeberSQL=self.getErrorIntegMemeberSQL().format(memberId=memberId)
-        cursor.execute(queryErrorIntegMemeberSQL)   
+
+        queryErrorIntegMemeberSQL = self.getErrorIntegMemeberSQL().format(
+            memberId=memberId)
+        cursor.execute(queryErrorIntegMemeberSQL)
         return cursor.fetchall()
-
-
 
     def queryBeChangedMember(self, file):
         db = self.getConnection()
@@ -231,70 +225,77 @@ class refreshInteg:
             IntegMembers = self.queryErrorIntegMemeber(memberId, cursor)
             if IntegMembers:
 
-                
                 for eMember in IntegMembers:
+                    try:
+                        beAddInteg = 0.0
+                        # 根据积分明细算出该党员的总分
+                        ecalc_aum = float(eMember[0])
+                        # 现在的总分
+                        ebase_point = float(eMember[1])
+                        # 该项满分
+                        eTotal = float(eMember[2])
+                        # 二级 ID
+                        ebase_ruleId = eMember[3]
+                        # 党员 ID
+                        ememberId = eMember[4]
+                        if memberId != ememberId:
+                            print('error')
 
-                    beAddInteg = 0.0
+                        if ecalc_aum != ebase_point:
 
-                    # 根据积分明细算出该党员的总分
-                    calc_aum = float(eMember[0])
-                    # 现在的总分
-                    base_point = float(eMember[1])
-                    # 该项满分
-                    cTotal = float(eMember[2]) 
-                    # 二级 ID
-                    base_ruleId = eMember[3]
-                    # 党员 ID
-                    cmemberId = eMember[4]
+                            #查询溢出的明细
+                            queryOverflowSQL = self.getOverFlowSubsidiarySQL(
+                            ).format(
+                                memberId=ememberId, base_ruleId=ebase_ruleId)
+                            cursor.execute(queryOverflowSQL)
+                            overFlowSubs = cursor.fetchall()
+                            # 处理冗余的积分明细
+                            self.doCalcEachMemberIntegSubsidiary(
+                                file, overFlowSubs, cursor)
 
-                    if calc_aum != base_point:
+                            # 如果该项明细总和大于现在该党员的积分
+                            if ecalc_aum > ebase_point:
+                                # 如果大于单项总分
+                                if ecalc_aum > eTotal:
+                                    beAddInteg = eTotal - ebase_point
 
-                        #查询溢出的明细
-                        queryOverflowSQL=self.getOverFlowSubsidiarySQL().format(memberId = cmemberId, base_ruleId = base_ruleId)
-                        cursor.execute(queryOverflowSQL)
-                        overFlowSubs = cursor.fetchall()
-                        # 处理冗余的积分明细
-                        self.doCalcEachMemberIntegSubsidiary(file, overFlowSubs, cursor)
-                        
-                        # 如果该项明细总和大于现在该党员的积分
-                        if calc_aum > base_point:
-                            # 如果大于单项总分
-                            if calc_aum > cTotal:
-                                beAddInteg = beAddInteg + cTotal - base_point
+                                else:
+                                    beAddInteg = ecalc_aum - ebase_point
 
-                            else:
-                                beAddInteg = beAddInteg + calc_aum -base_point
+                                print('large：', beAddInteg, 'ecalc_aum:',
+                                      ecalc_aum, 'ebase_point:', ebase_point,
+                                      'eTotal:', eTotal, 'ebase_ruleId:',
+                                      ebase_ruleId, 'memberId:', ememberId)
+                            elif ecalc_aum < ebase_point:
+                                #   if ebase_point > eTotal:
+                                beAddInteg = ecalc_aum - ebase_point
 
-                            print('large：',beAddInteg)
-                        elif calc_aum < base_point:
-                            beAddInteg = beAddInteg + calc_aum -  base_point
+                                print('lower：', beAddInteg, 'ecalc_aum:',
+                                      ecalc_aum, 'ebase_point:', ebase_point,
+                                      'eTotal:', eTotal, 'ebase_ruleId:',
+                                      ebase_ruleId, 'memberId:', ememberId)
 
-                            print('lower：', beAddInteg)
-                        
-                        ## 更新Base分数
-                        updatebaseIntegSQL =  self.getUpdateBaseIntegSQL().format(subtraction = beAddInteg, memberId = cmemberId, ruleFid = base_ruleId)
+                            if beAddInteg != 0.0:
+                                ## 更新Base分数
+                                updatebaseIntegSQL = self.getUpdateBaseIntegSQL(
+                                ).format(
+                                    subtraction=beAddInteg,
+                                    memberId=ememberId,
+                                    ruleFid=ebase_ruleId)
 
-                        file.write(updatebaseIntegSQL)
-                         ## 更新 point
-                        updatePersonPointSQL = self.getUpdatePersonPointSQL().format(subtraction = beAddInteg, memberId = cmemberId)
-                        file.write(updatePersonPointSQL)
-                        #print(calc_aum, base_point, cTotal, base_ruleId, memberId)
-                      
-                
-            
-                   
+                                file.write(updatebaseIntegSQL)
+                                ## 更新 point
+                                updatePersonPointSQL = self.getUpdatePersonPointSQL(
+                                ).format(
+                                    subtraction=beAddInteg, memberId=ememberId)
+                                file.write(updatePersonPointSQL)
+                            #print(calc_aum, base_point, cTotal, base_ruleId, memberId)
+                    except:
+                        traceback.print_exc()
+                        db.rollback()
 
-
-
-                    
-
-
-
-                   
-           # else:
-                #print('no error {memberId}',memberId)
-           
-
+            else:
+                print('---------------------------------', memberId)
 
         # 处理完一个党员的数据
 

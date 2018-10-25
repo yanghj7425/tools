@@ -47,14 +47,17 @@ class refreshPoint:
 
     def getBaseInfoSumSQL(self):
 
-        return '''
-                    SELECT 
-                        sum(BASCPOINT)
+        return '''                   
+                SELECT 
+                    sum(BASCPOINT)
+                FROM
+                    (SELECT DISTINCT
+                        BASCRULEID, BASCPOINT, YEAR, MEMBERID
                     FROM
                         integ_base
                     WHERE
                         memberid = '{memberId}'
-                            AND year = '2018'
+                            AND year = '2018') A ;
                 '''
     
     def getUpdateTotalPointSQL(self):
@@ -66,13 +69,11 @@ class refreshPoint:
                     memberid = '{memberId}' AND year = '2018';
               '''
 
-
     def refresh(self,file):
         db = self.getConnection()
         cursor = db.cursor()
 
         cursor.execute(self.getTotalPointSQL())
-
 
         memberPoints = cursor.fetchall()
 
@@ -80,26 +81,22 @@ class refreshPoint:
 
             memberId = memberPoint[0]
             totalPoint = float(memberPoint[1])
-
             queryMemberBaseSumSQL = self.getBaseInfoSumSQL().format(memberId = memberId)
             cursor.execute(queryMemberBaseSumSQL)
 
             memberBaseSums = cursor.fetchall()
 
             for memberBaseSum in memberBaseSums:
-                baseSum = float(memberBaseSum[0])
-                if totalPoint != baseSum:
-                    print(memberId, totalPoint, baseSum)
-                    updateTotalPointSQL = self.getUpdateTotalPointSQL().format(memberId = memberId, baseSum = baseSum )
-                    file.write(updateTotalPointSQL)
-
-
-
-
-
-
-
-
+                try: 
+                    baseSum = float(memberBaseSum[0])
+                    if totalPoint != baseSum:
+                        print('memberId:',memberId,'baseSum:',baseSum)
+                        updateTotalPointSQL = self.getUpdateTotalPointSQL().format(memberId = memberId, baseSum = baseSum )
+                        file.write(updateTotalPointSQL)
+                except:
+                    print(memberId)
+                    traceback.print_exc()
+                    db.rollback()
 
 
 a = refreshPoint()
