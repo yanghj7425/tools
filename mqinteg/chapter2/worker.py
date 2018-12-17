@@ -6,7 +6,7 @@ connection = pika.BlockingConnection(
 
 channel = connection.channel()
 
-channel.queue_declare(queue='task_queue', durable=True)
+# channel.queue_declare(queue='task_queue', durable=True)
 print('[*] Waiting for message. To exit press CTRL+C')
 
 
@@ -18,5 +18,5 @@ def callback(ch, method, properties, body):
 
 
 channel.basic_qos(prefetch_count=1)
-channel.basic_consume(callback, queue='task_queue')
+channel.basic_consume(callback, queue='task_queue', no_ack=False)
 channel.start_consuming()
