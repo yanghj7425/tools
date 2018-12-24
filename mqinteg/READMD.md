@@ -59,7 +59,9 @@ RabbitMQ 的核心: 发布者不直接把消息发送给队列（甚至不知道
 - 直连交换机(direct): 交换机将会对绑定键（binding key）和路由键（routing key）进行精确匹配，从而确定消息该分发到哪个队列。
   - 绑定键: 绑定（binding）是指交换机（exchange）和队列（queue）的关系
   - 路由键：routing_key 参数
-- 主题交换机(topic):
+- 主题交换机(topic): 发送到主题交换机的路由键（routing_key），必须是由 `.` 分隔开的词语列表。
+  - `*` 用来表示一个单词。
+  - `#` 用来表示任意数量（零个或多个）的单词。
 - 头叫环节(headers):
 - 扇形交换机(fanout): 把消息发送给它所知道的所有队列，会忽略 routing_key 参数值
 
