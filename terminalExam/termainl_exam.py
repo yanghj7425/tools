@@ -141,6 +141,7 @@ class Terminal:
         for each_ship in ships_info:
             if each_ship.get('name') == be_sorted_name:
                 sorted_ships_info.append(each_ship)
+        # 排序
         sorted_ships_info.sort(key=lambda k: (k.get('time', 0)), reverse=False)
         return sorted_ships_info
 
