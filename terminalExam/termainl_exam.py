@@ -216,6 +216,7 @@ class Terminal:
         # print(counts_arr)
 
     def showPanl(self, ships_info):
+
         fig = plt.figure(figsize=(9, 7))
         fig.add_subplot(221)  #2行2列第1幅图
         will_sorted_name = ['1XJBH', '1XJAB']

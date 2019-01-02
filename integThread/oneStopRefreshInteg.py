@@ -9,10 +9,10 @@ import math
 
 class oneStopRefreshInteg:
     def __init__(self):
-        self.host = '192.168.0.49'
+        self.host = 'xcxmaster.sky.org'
         self.port = 3306
-        self.user = 'root'
-        self.password = 'dreamsoft'
+        self.user = 'ipb_pudong'
+        self.password = 'DreamSoft@888'
         self.dataBase = 'ipb_pudong'
 
     def getConnection(self):
@@ -35,7 +35,7 @@ class oneStopRefreshInteg:
             # 清空个人积分
             self.clearBaseAndPoint(cursor, memberId)
             db.commit()
-            print(threadName, ":", memberId)
+            # print(threadName, ":", memberId)
             # print(":")
             for rule in rules:
                 sTotal = 0.0
@@ -73,7 +73,7 @@ class oneStopRefreshInteg:
     def _main(self, threadCounts):
         beRefreshMeberCounts = self.getRefreshMemberCcount()[0]
         eachTheardParseCounts = math.ceil(beRefreshMeberCounts / threadCounts)
-        print(beRefreshMeberCounts)
+        # print(beRefreshMeberCounts)
         for i in range(threadCounts):
             threadName = 'thread_' + str(i)
             startIndex = eachTheardParseCounts * i
@@ -90,6 +90,7 @@ class oneStopRefreshInteg:
                                 integ_base
                             WHERE
                                 MEMBERID = '{memberId}'
+                                AND YEAR =  date_format(now(),"%Y");
          
                          """
         cursor.execute(sumIntegBaseSQL.format(memberId=memberId))
@@ -175,6 +176,7 @@ class oneStopRefreshInteg:
                                   integ_person_point
                               WHERE
                                   memberId = '{memberId}'
+                                  AND year = DATE_FORMAT(NOW(), '%Y')
                              """
         formatSQL = queryIntegPointSql.format(memberId=memberId)
 
@@ -254,6 +256,7 @@ class oneStopRefreshInteg:
                         WHERE
                           PARTY_MEMBER_ID = '{cmemberId}'
                             AND rule_id = '{ruleId}'
+                            AND year = DATE_FORMAT(NOW(), '%Y')
                        """
         sql = subSidarySQL.format(cmemberId=memberId, ruleId=ruleId)
         cursor.execute(sql)
