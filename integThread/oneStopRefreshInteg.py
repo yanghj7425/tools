@@ -9,11 +9,11 @@ import math
 
 class oneStopRefreshInteg:
     def __init__(self):
-        self.host = 'xcxmaster.sky.org'
+        self.host = 'host'
         self.port = 3306
-        self.user = 'ipb_pudong'
-        self.password = 'DreamSoft@888'
-        self.dataBase = 'ipb_pudong'
+        self.user = 'root'
+        self.password = 'root'
+        self.dataBase = 'test'
 
     def getConnection(self):
         db = mysql.connect(
