@@ -1,19 +1,21 @@
+#coding=utf-8
 import pymysql as mysql
 
 import traceback
 import time
 import datetime
 import re
+import os
 
 
 class Mysql2Orcl:
 
     def __init__(self):
-        self.host = 'host'
-        self.port = 3306
-        self.user = 'user'
-        self.password = 'passwd'
-        self.dataBase = 'dsfa0611'
+        self.host = '192.168.0.6'
+        self.port = 3307
+        self.user = 'dsfa'
+        self.password = 'dsfa@123'
+        self.dataBase = 'dsfa'
         self.db = self.__getConnection()
         self.dataSet = self.__initDataSet()
 
@@ -22,7 +24,6 @@ class Mysql2Orcl:
         dataSet['varchar'] = 'NVARCHAR2'
         dataSet['datetime'] = 'TIMESTAMP'
         dataSet['decimal'] = 'NUMBER'
-        dataSet['text'] = 'CLOB'
         dataSet['int'] = 'NUMBER'
         return dataSet
 
@@ -37,17 +38,21 @@ class Mysql2Orcl:
         )
         return db
 
-    def getCharSetType(self, info):
+    def __getCharSetType(self, info):
         typeSize = info[2]
-        typeInfo = info[1]
-        dataSet = self.dataSet[info[1]]
-        if typeSize is None and typeInfo == 'int':
-            return dataSet + '(10)'
+        mysqlTypeInfo = info[1]
 
-        if dataSet == 'CLOB':
-            return dataSet
+        if 'text' in mysqlTypeInfo:
+            return 'CLOB'
 
-        return typeInfo + '(' + str(typeSize) + ')'
+        dataSet = self.dataSet[mysqlTypeInfo]
+        if typeSize is None:
+            if mysqlTypeInfo == 'int':
+                return dataSet + '(10)'
+            else:
+                return dataSet
+
+        return dataSet + '(' + str(typeSize) + ')'
 
     def queryTables(self):
         sql = '''
@@ -59,9 +64,144 @@ class Mysql2Orcl:
                   TABLE_SCHEMA = '{dbName}'
                   AND TABLE_NAME like concat('dsfa_','%')
               '''
-        return self.queryData(sql.format(dbName=self.dataBase))
+        return self.__queryData(sql.format(dbName=self.dataBase))
 
-    def queryTableColumns(self, tableName):
+    
+
+    def constructCteateStatement(self, tableName):
+        '''
+        文档注释
+
+        Description
+            生成对应表 oracle 下的 create 语句
+
+            Return
+                string : 生成的 create 语句字符串
+
+        '''
+        tableInfos = mysql2Orcl.__queryTableColumns(tableName)
+        sql = '''
+CREATE TABLE {tableName}
+(
+    {columns}
+);
+              '''
+
+        columns = ''
+
+        try:
+            for info in tableInfos:
+                columns += info[0].upper() + '\t' + \
+                    self.__getCharSetType(info) + ', \n\t\t'
+
+            columns = columns[:-5]
+            return sql.format(tableName=tableName, columns=columns)
+        except:
+            traceback.print_exc()
+            print(tableName)
+
+    def constructInsertStatement(self, tableName):
+        '''
+        文档注释
+
+        Description
+            构造 insert 语句,并生成对应文件。文件调用 mysqldump 工具生成。
+            Args
+                tableName : 表名
+        '''
+        self.__exportMysqlDump(tableName)
+        self.__deleteSpecialSimple(tableName)
+
+
+    def constructDropTableStatement(self,tableName):
+        '''
+        文档注释
+
+        Description
+            构造 drop 语句
+
+            Args
+                tableName : 表名
+
+            Return 
+                drop 语句
+        '''
+        dropSQL = 'drop table {tableName}; \n'.format(tableName = tableName)
+        return dropSQL.upper()
+
+
+    def __queryData(self, sql):
+        '''
+        文档注释
+
+        Description
+            查询执行SQL
+
+            Args
+                sql : 需要执行得SQL
+
+            Return 
+                执行结果
+        '''
+        cursor = self.db.cursor()
+        cursor.execute(sql)
+        return cursor.fetchall()
+
+
+    def __deleteSpecialSimple(self, tableName):
+        '''
+          文档注释
+
+          Description
+              删除导出文件中的 '`' 符号
+
+              Args
+                  tableName: 表名
+        '''
+        rRegex = r'INSERT .*? VALUES'
+        file = 'mysqldump_{tableName}_Insert.sql'.format(tableName=tableName)
+        with open(file, "r", encoding="utf-8") as f1, open("%s.bak" % file, "w", encoding="utf-8") as f2:
+            for line in f1:
+                matchObj = re.search(rRegex, line)
+                if matchObj:
+                    replaceStr = matchObj.group().replace('`', '')
+                    line = line.replace(matchObj.group(), replaceStr.upper())
+                    f2.write(line)
+
+        os.remove(file)
+        os.rename("%s.bak" % file, file)
+
+
+    def __exportMysqlDump(self, tableName):
+        '''
+        文档注释
+
+        Description
+            调用 mysqldump 工具生成包含 insert 语句的SQL
+            Args
+                tableName : 表名
+        '''
+        cmd = 'mysqldump  --user={user} -p{password}  --host={host} --port={port} --protocol=tcp  --skip-comments --allow-keywords --default-character-set=utf8 --skip-add-locks  --extended-insert=FALSE  --single-transaction=TRUE --no-create-info --skip-triggers {dbname} {tableName} > mysqldump_{tableName}_Insert.sql'
+        os.system(cmd.format(user=self.user,
+                             password=self.password,
+                             host=self.host,
+                             port=self.port,
+                             dbname=self.dataBase,
+                             tableName=tableName))
+
+
+    def __queryTableColumns(self, tableName):
+        '''
+          文档注释
+
+          Description
+              查询 mysql 表 的对应列信息
+
+              Return
+                  所查询表对应列的 tuble
+
+        '''
+
         sql = '''
                SELECT
                   COLUMN_NAME,       DATA_TYPE,    CHARACTER_MAXIMUM_LENGTH,
@@ -73,44 +213,51 @@ class Mysql2Orcl:
                     AND TABLE_NAME = '{tableName}'
               '''
 
-        return self.queryData(sql.format(dbName=self.dataBase, tableName=tableName))
+        return self.__queryData(sql.format(dbName=self.dataBase, tableName=tableName))
 
-    def constructCteateStatement(self, tableName):
-        tableInfos = mysql2Orcl.queryTableColumns(tableName)
-        sql = '''CREATE TABLE {tableName}
-                (
-                  {columns}
-                );
-              '''
-
-        columns = ''
-
-        try:
-            for info in tableInfos:
-                columns += info[0].upper() + '\t' + \
-                    self.getCharSetType(info) + ', \r\n\t\t'
-
-            columns = columns[:-6]
-            return sql.format(tableName=tableName, columns=columns)
-        except:
-            traceback.print_exc()
-            print(tableName)
-
-    def queryData(self, sql):
-        cursor = self.db.cursor()
-        cursor.execute(sql)
-        return cursor.fetchall()
 
 
 mysql2Orcl = Mysql2Orcl()
-# dsfa_syslog_operate
 
-# statement = mysql2Orcl.constructCteateStatement('dsfa_syslog_operate')
-# print(statement)
+t = time.time()
 
 
 tables = mysql2Orcl.queryTables()
-for table in tables:
-    tableName = table[0]
-    statement = mysql2Orcl.constructCteateStatement(tableName)
-    print(statement)
+
+# cms_auth
+
+tableName = 'cms_auth'
+mysql2Orcl.constructInsertStatement(tableName)
+
+dropFile = open('Mysql2Orcl_{dbname}_Drop_'.format(dbname=mysql2Orcl.dataBase) + str(int(t)) +
+                  '.sql', 'a', encoding='utf-8')
+statement = mysql2Orcl.constructDropTableStatement(tableName)
+dropFile.write(statement)
+dropFile.close
+
+createFile = open('Mysql2Orcl_{dbname}_Create_'.format(dbname=mysql2Orcl.dataBase) + str(int(t)) +
+                  '.sql', 'a', encoding='utf-8')
+statement = mysql2Orcl.constructCteateStatement(tableName)
+createFile.write(statement)
+createFile.close
+
+
+
+
+# for table in tables:
+#     mysql2Orcl.constructInsertStatement(table[0])
+
+# dropFile = open('Mysql2Orcl_{dbname}_Drop_'.format(dbname=mysql2Orcl.dataBase) + str(int(t)) +
+#                   '.sql', 'a', encoding='utf-8')
+# for table in tables:
+#     statement = mysql2Orcl.constructDropTableStatement(table[0])
+#     dropFile.write(statement)
+# dropFile.close
+
+
+# createFile = open('Mysql2Orcl_{dbname}_Create_'.format(dbname=mysql2Orcl.dataBase) + str(int(t)) +
+#                   '.sql', 'a', encoding='utf-8')
+# for table in tables:
+#     statement = mysql2Orcl.constructCteateStatement(table[0])
+#     createFile.write(statement)
+# createFile.close
